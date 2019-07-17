@@ -19,31 +19,52 @@ follow up PR.
  .../app.config                                   | 16 ++++++++++++++++
  2 files changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs b/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
-index d9d2e29b795..5e18e203db8 100644
---- a/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
-+++ b/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
-@@ -561,8 +561,7 @@ static void UpdateMSBuildExeConfigFile (TargetRuntime runtime, string sourceConf
+Index: xamarin-pkg-monodevelop/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
+===================================================================
+--- xamarin-pkg-monodevelop.orig/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
++++ xamarin-pkg-monodevelop/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
+@@ -556,8 +556,7 @@ namespace MonoDevelop.Projects.MSBuild
  				ConfigFileUtilities.SetOrAppendSubelementAttributeValue (runtimeElement, "AppContextSwitchOverrides", "value", "Switch.System.IO.UseLegacyPathHandling=false");
  			}
  
 -			var toolset = doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset")?.FirstOrDefault ();
 -			if (toolset != null) {
-+			foreach (var toolset in doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset")) {
++			foreach (var toolset in doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset") ?? Enumerable.Empty<XElement> ()) {
  
  				// This is required for MSBuild to properly load the searchPaths element (@radical knows why)
  				SetMSBuildConfigProperty (toolset, "MSBuildBinPath", binDir, append: false, insertBefore: true);
-@@ -728,4 +727,4 @@ static Task ReleaseProjectBuilderNoLock (RemoteBuildEngine engine)
+@@ -591,7 +590,7 @@ namespace MonoDevelop.Projects.MSBuild
+ 						SetMSBuildConfigProperty (toolset, path.Property, path.Path);
+ 				}
+ 
+-				var projectImportSearchPaths = doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset")?.FirstOrDefault ()?.Element ("projectImportSearchPaths");
++				var projectImportSearchPaths = toolset.Element ("projectImportSearchPaths");
+ 				if (projectImportSearchPaths != null) {
+ 					var os = Platform.IsMac ? "osx" : Platform.IsWindows ? "windows" : "unix";
+ 					XElement searchPaths = projectImportSearchPaths.Elements ("searchPaths").FirstOrDefault (sp => sp.Attribute ("os")?.Value == os);
+@@ -603,9 +602,10 @@ namespace MonoDevelop.Projects.MSBuild
+ 					foreach (var path in MSBuildProjectService.GetProjectImportSearchPaths (runtime, false))
+ 						SetMSBuildConfigProperty (searchPaths, path.Property, path.Path, append: true, insertBefore: false);
+ 				}
+-				doc.Save (destinationConfigFile);
+ 			}
+ 
++			doc.Save (destinationConfigFile);
++
+ 			// Update the sdk list for the MD resolver
+ 			SdkInfo.SaveConfig (mdResolverConfig, MSBuildProjectService.FindRegisteredSdks ());
+ 		}
+@@ -723,4 +723,4 @@ namespace MonoDevelop.Projects.MSBuild
  			return Task.CompletedTask;
  		}
  	}
 -}
 \ No newline at end of file
 +}
-diff --git a/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config b/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
-index 71ab6f02208..98fcdc78cc4 100644
---- a/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
-+++ b/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
+Index: xamarin-pkg-monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
+===================================================================
+--- xamarin-pkg-monodevelop.orig/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
++++ xamarin-pkg-monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
 @@ -47,6 +47,22 @@
  				</searchPaths>
  			</projectImportSearchPaths>
@@ -67,48 +88,3 @@ index 71ab6f02208..98fcdc78cc4 100644
  	</msbuildToolsets>
  
  </configuration>
-
-From 696d448eb01098f3d7e8347d4967aae8b4a0a0d0 Mon Sep 17 00:00:00 2001
-From: Ankit Jain <radical@gmail.com>
-Date: Wed, 3 Apr 2019 10:12:53 -0400
-Subject: [PATCH 2/2] [msbuild] Fix possible NRE
-
-- and save only at the end.
----
- .../RemoteBuildEngineManager.cs                            | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs b/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
-index 5e18e203db8..0d012cc0432 100644
---- a/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
-+++ b/src/core/MonoDevelop.Core/MonoDevelop.Projects.MSBuild/RemoteBuildEngineManager.cs
-@@ -561,7 +561,7 @@ static void UpdateMSBuildExeConfigFile (TargetRuntime runtime, string sourceConf
- 				ConfigFileUtilities.SetOrAppendSubelementAttributeValue (runtimeElement, "AppContextSwitchOverrides", "value", "Switch.System.IO.UseLegacyPathHandling=false");
- 			}
- 
--			foreach (var toolset in doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset")) {
-+			foreach (var toolset in doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset") ?? Enumerable.Empty<XElement> ()) {
- 
- 				// This is required for MSBuild to properly load the searchPaths element (@radical knows why)
- 				SetMSBuildConfigProperty (toolset, "MSBuildBinPath", binDir, append: false, insertBefore: true);
-@@ -595,7 +595,7 @@ static void UpdateMSBuildExeConfigFile (TargetRuntime runtime, string sourceConf
- 						SetMSBuildConfigProperty (toolset, path.Property, path.Path);
- 				}
- 
--				var projectImportSearchPaths = doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset")?.FirstOrDefault ()?.Element ("projectImportSearchPaths");
-+				var projectImportSearchPaths = toolset.Element ("projectImportSearchPaths");
- 				if (projectImportSearchPaths != null) {
- 					var os = Platform.IsMac ? "osx" : Platform.IsWindows ? "windows" : "unix";
- 					XElement searchPaths = projectImportSearchPaths.Elements ("searchPaths").FirstOrDefault (sp => sp.Attribute ("os")?.Value == os);
-@@ -607,9 +607,10 @@ static void UpdateMSBuildExeConfigFile (TargetRuntime runtime, string sourceConf
- 					foreach (var path in MSBuildProjectService.GetProjectImportSearchPaths (runtime, false))
- 						SetMSBuildConfigProperty (searchPaths, path.Property, path.Path, append: true, insertBefore: false);
- 				}
--				doc.Save (destinationConfigFile);
- 			}
- 
-+			doc.Save (destinationConfigFile);
-+
- 			// Update the sdk list for the MD resolver
- 			SdkInfo.SaveConfig (mdResolverConfig, MSBuildProjectService.FindRegisteredSdks ());
- 		}
