@@ -1,3 +1,13 @@
+monodevelop (7.8.2.1-0xamarin9) vs; urgency=medium
+
+  [ Xamarin Public Jenkins (auto-signing) ]
+  * Packaging bugfix:
+
+  [ Ubuntu ]
+  * [09cd5f3] Revert "Add an exclude rule" [7235280] Add an exclude rule
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Wed, 17 Jul 2019 16:47:42 +0000
+
 monodevelop (7.8.2.1-0xamarin8) preview; urgency=medium
 
   * Packaging bugfix:
