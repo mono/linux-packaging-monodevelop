@@ -1,3 +1,9 @@
+monodevelop (7.8.4.1-0xamarin1) preview; urgency=medium
+
+  * New release - monodevelop-7.8.4.1.tar.bz2
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Thu, 18 Jul 2019 13:34:15 +0000
+
 monodevelop (7.8.2.1-0xamarin10) vs; urgency=medium
 
   * Packaging bugfix:
