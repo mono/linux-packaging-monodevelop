@@ -1,7 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Gdb/MonoDevelop.Debugger.Gdb.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Gdb/MonoDevelop.Debugger.Gdb.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Gdb/MonoDevelop.Debugger.Gdb.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Gdb/obj/Debug/MonoDevelop.Debugger.Gdb.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Gdb/obj/Debug/MonoDevelop.Debugger.Gdb.csproj.CopyComplete
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Gdb/obj/Debug/MonoDevelop.Debugger.Gdb.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Gdb/obj/Debug/MonoDevelop.Debugger.Gdb.pdb

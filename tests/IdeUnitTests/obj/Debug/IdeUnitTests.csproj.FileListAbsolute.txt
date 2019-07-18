@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/tests/IdeUnitTests.xml
-/home/directhex/Projects/monodevelop/main/build/tests/IdeUnitTests.dll
-/home/directhex/Projects/monodevelop/main/build/tests/IdeUnitTests.pdb
-/home/directhex/Projects/monodevelop/main/tests/IdeUnitTests/obj/Debug/IdeUnitTests.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/tests/IdeUnitTests/obj/Debug/IdeUnitTests.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/tests/IdeUnitTests/obj/Debug/IdeUnitTests.csproj.CopyComplete
-/home/directhex/Projects/monodevelop/main/tests/IdeUnitTests/obj/Debug/IdeUnitTests.dll
-/home/directhex/Projects/monodevelop/main/tests/IdeUnitTests/obj/Debug/IdeUnitTests.pdb

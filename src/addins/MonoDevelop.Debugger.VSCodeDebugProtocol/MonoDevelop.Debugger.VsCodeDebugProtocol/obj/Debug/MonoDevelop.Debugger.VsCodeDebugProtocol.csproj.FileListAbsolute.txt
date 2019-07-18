@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.VsCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.VsCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.VsCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.VSCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol/obj/Debug/MonoDevelop.Debugger.VsCodeDebugProtocol.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.VSCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol/obj/Debug/MonoDevelop.Debugger.VsCodeDebugProtocol.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.VSCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol/obj/Debug/MonoDevelop.Debugger.VsCodeDebugProtocol.csproj.CopyComplete
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.VSCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol/obj/Debug/MonoDevelop.Debugger.VsCodeDebugProtocol.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.VSCodeDebugProtocol/MonoDevelop.Debugger.VsCodeDebugProtocol/obj/Debug/MonoDevelop.Debugger.VsCodeDebugProtocol.pdb

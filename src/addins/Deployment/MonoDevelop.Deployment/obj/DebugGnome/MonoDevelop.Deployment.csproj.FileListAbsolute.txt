@@ -1,6 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment/obj/DebugGnome/MonoDevelop.Deployment.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment/obj/DebugGnome/MonoDevelop.Deployment.dll
-/home/directhex/Projects/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment/obj/DebugGnome/MonoDevelop.Deployment.pdb

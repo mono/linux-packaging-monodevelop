@@ -1,9 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor.dll.config
-/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/GeneratedInternalsVisibleTo.cs
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.pdb

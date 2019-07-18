@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll.config
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.pdb

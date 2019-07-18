@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/NUnit/TestRunner.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/NUnit/TestRunner.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/NUnit/TestRunner.pdb
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.csproj.CopyComplete
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.dll
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.pdb

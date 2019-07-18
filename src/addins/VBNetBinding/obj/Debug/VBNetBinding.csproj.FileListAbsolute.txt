@@ -1,7 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/VBNetBinding/MonoDevelop.VBNetBinding.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/VBNetBinding/MonoDevelop.VBNetBinding.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/VBNetBinding/MonoDevelop.VBNetBinding.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/VBNetBinding/obj/Debug/MonoDevelop.VBNetBinding.dll
-/home/directhex/Projects/monodevelop/main/src/addins/VBNetBinding/obj/Debug/MonoDevelop.VBNetBinding.pdb

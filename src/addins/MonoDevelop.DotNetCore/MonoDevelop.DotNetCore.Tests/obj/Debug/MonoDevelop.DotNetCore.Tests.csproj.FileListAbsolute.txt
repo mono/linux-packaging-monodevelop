@@ -1,7 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.DotNetCore.Tests.xml
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.DotNetCore.Tests.dll
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.DotNetCore.Tests.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.Tests/obj/Debug/MonoDevelop.DotNetCore.Tests.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.Tests/obj/Debug/MonoDevelop.DotNetCore.Tests.csproj.CopyComplete
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.Tests/obj/Debug/MonoDevelop.DotNetCore.Tests.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.Tests/obj/Debug/MonoDevelop.DotNetCore.Tests.pdb

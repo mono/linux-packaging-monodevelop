@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/obj/Debug/MonoDevelop.DotNetCore.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/obj/Debug/MonoDevelop.DotNetCore.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/obj/Debug/GeneratedInternalsVisibleTo.cs
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/obj/Debug/MonoDevelop.DotNetCore.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DotNetCore/obj/Debug/MonoDevelop.DotNetCore.pdb
