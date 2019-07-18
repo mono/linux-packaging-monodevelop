@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/CSharpBinding/MonoDevelop.CSharpBinding.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/CSharpBinding/MonoDevelop.CSharpBinding.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/CSharpBinding/MonoDevelop.CSharpBinding.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/obj/Debug/CSharpBinding.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/obj/Debug/CSharpBinding.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/obj/Debug/GeneratedInternalsVisibleTo.cs
-/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/obj/Debug/MonoDevelop.CSharpBinding.dll
-/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/obj/Debug/MonoDevelop.CSharpBinding.pdb

@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Refactoring.Tests.xml
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Refactoring.Tests.dll
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Refactoring.Tests.pdb
-/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Refactoring.Tests/obj/Debug/MonoDevelop.Refactoring.Tests.csprojAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Refactoring.Tests/obj/Debug/MonoDevelop.Refactoring.Tests.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Refactoring.Tests/obj/Debug/MonoDevelop.Refactoring.Tests.csproj.CopyComplete
-/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Refactoring.Tests/obj/Debug/MonoDevelop.Refactoring.Tests.dll
-/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Refactoring.Tests/obj/Debug/MonoDevelop.Refactoring.Tests.pdb
