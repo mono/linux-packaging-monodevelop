@@ -66,6 +66,7 @@ Source:         %{name}-%{version}.tar.bz2
 Patch0:		no-ssh-please-were-british.patch
 Patch1:		fixautoreconf.patch
 Patch2:		7381.patch
+Patch3:		vside_myget.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 #BuildArch:      noarch
 Requires:       mono-basic
@@ -107,6 +108,7 @@ This package contains development files for the IDE and plugins.
 %setup -q -n monodevelop-7.8
 %patch1 -p1
 %patch2 -p1
+%patch3 -p1
 %if 0%{?rhel} >= 8
 %patch0 -p1
 %endif
